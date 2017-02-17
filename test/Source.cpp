@@ -1,7 +1,10 @@
 #include <string>
 #include <iostream>
 
-#include "digraph.h"
+#define CATCH_CONFIG_MAIN
+#include "catch.hpp"
+
+#include <digraph/digraph.h>
 
 
 
@@ -24,8 +27,12 @@ struct MyType
     };
 };
 
+TEST_CASE( "Test", "[test]" )
+{
+    REQUIRE( 1 == 1 );
+}
 
-int main( int, char** )
+int func( int, char** )
 {
     std::string s2 = "kkk";
     digraph<MyType>::node_container c{ digraph<MyType>::node_type( s2 ) };
@@ -38,4 +45,5 @@ int main( int, char** )
         auto& s = *edge_a_b;
     }
     int a = 0;
+    return 0;
 }
