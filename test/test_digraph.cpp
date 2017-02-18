@@ -53,6 +53,15 @@ struct getvertices_by_value_MyType
 using digraph_t = digraph::digraph<MyType, getvertices_MyType, hash_MyType, equal_to_MyType>;
 using digraph_by_val_t = digraph::digraph<MyType, getvertices_by_value_MyType, hash_MyType, equal_to_MyType>;
 
+
+TEST_CASE( "DiGraph default constructed has no edges nor vertices", "[digraph]" )
+{
+    digraph_t g;
+    REQUIRE( g.edges().empty() );
+    REQUIRE( g.vertices().empty() );
+}
+
+
 TEST_CASE( "DiGraph created from elems contains the edges and vertices that it was created from", "[digraph]" )
 {
     digraph_t g{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
@@ -213,6 +222,36 @@ TEST_CASE( "DiGraph (getter_by_value)  move assignment move the graph", "[digrap
     g_b = std::move( g_a );
     REQUIRE( g_b == g_a_copy );
     REQUIRE( g_a != g_a_copy );
+}
+
+TEST_CASE( "DiGraph is swappable", "[digraph]" )
+{
+    digraph_t g_a{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
+    digraph_t g_a_copy = g_a;
+    digraph_t g_b{ { "A", "B" },{ "B","C" } ,{ "C","A" } };
+    digraph_t g_b_copy = g_b;
+    using digraph::swap;
+    REQUIRE( g_a == g_a_copy );
+    REQUIRE( g_b == g_b_copy );
+    swap( g_a, g_b );
+    REQUIRE( g_a == g_b_copy );
+    REQUIRE( g_b == g_a_copy );
+
+}
+
+TEST_CASE( "DiGraph (getter_by_value) is swappable", "[digraph]" )
+{
+    digraph_by_val_t g_a{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
+    digraph_by_val_t g_a_copy = g_a;
+    digraph_by_val_t g_b{ { "A", "B" },{ "B","C" } ,{ "C","A" } };
+    digraph_by_val_t g_b_copy = g_b;
+    using digraph::swap;
+    REQUIRE( g_a == g_a_copy );
+    REQUIRE( g_b == g_b_copy );
+    swap( g_a, g_b );
+    REQUIRE( g_a == g_b_copy );
+    REQUIRE( g_b == g_a_copy );
+
 }
 
 

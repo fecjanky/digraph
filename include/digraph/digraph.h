@@ -366,6 +366,7 @@ inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash
 template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
 inline void digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::swap( digraph & other ) noexcept
 {
+    using std::swap;
     swap( _edges, other._edges );
     swap( _vertices, other._vertices );
     swap( _g, other._g );
@@ -512,6 +513,19 @@ template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal
 inline bool digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::operator!=( const digraph& rhs ) const noexcept
 {
     return !(*this == rhs);
+}
+
+template<
+    typename edge_t,
+    class vertex_getter,
+    class edge_hash,
+    class edge_equal_to,
+    class vertex_hash,
+    class vertex_equal_to
+>
+void swap( digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>& lhs, digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>& rhs ) noexcept
+{
+    lhs.swap( rhs );
 }
 
 
