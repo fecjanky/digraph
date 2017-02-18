@@ -18,9 +18,7 @@ matrix:
         - CXX_USED=g++-5
         - CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=COVERAGE"
       install:
-        - pip install --user --upgrade pip
-        - pip install --user urllib3
-        - pip install --user cpp-coveralls
+        - pip install --user urllib3[secure] cpp-coveralls
       after_success:
         - coveralls --gcov $(which gcov-5) --include include --gcov-options '\-lmpcu' --root .. --build-root .
 
