@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DIGRAPH_DIGRAPH_H_INCLUDED__
+#define DIGRAPH_DIGRAPH_H_INCLUDED__
 
 #include <type_traits>
 #include <vector>
@@ -423,3 +424,4 @@ inline digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_eq
 }
 
 
+#endif  //DIGRAPH_DIGRAPH_H_INCLUDED__
