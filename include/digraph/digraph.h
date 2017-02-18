@@ -146,7 +146,7 @@ template<
     typename edge_t,
     class vertex_getter,
     class edge_hash         = std::hash<edge_t>,
-    class edge_equal_to     = detail::equal_to_t<edge_t>,
+    class edge_equal_to     = std::equal_to<edge_t>,
     class vertex_hash_      = std::hash<std::remove_cv_t<detail::underlying_type_t<edge_t, vertex_getter>>>,
     class vertex_equal_to_  = std::equal_to<detail::underlying_type_t<edge_t, vertex_getter>>
 >
