@@ -20,7 +20,6 @@ matrix:
       install:
         - pip install --user --upgrade pip
         - pip install --user urllib3
-        - pip install --user urllib3secure
         - pip install --user cpp-coveralls
       after_success:
         - coveralls --gcov $(which gcov-5) --include include --gcov-options '\-lmpcu' --root .. --build-root .
