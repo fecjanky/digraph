@@ -145,7 +145,7 @@ using equal_to_t = typename unordered_traits < T, std::hash<size_t>, EqualTo>::e
 template<
     typename edge_t,
     class vertex_getter,
-    class edge_hash         = detail::hash_t<edge_t>,
+    class edge_hash         = std::hash<edge_t>,
     class edge_equal_to     = detail::equal_to_t<edge_t>,
     class vertex_hash_      = std::hash<std::remove_cv_t<detail::underlying_type_t<edge_t, vertex_getter>>>,
     class vertex_equal_to_  = std::equal_to<detail::underlying_type_t<edge_t, vertex_getter>>
