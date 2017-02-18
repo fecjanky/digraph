@@ -204,6 +204,7 @@ template<
     class vertex_getter,
     class edge_hash = detail::hash_t<edge_t>,
     class edge_equal_to = detail::equal_to_t<edge_t>,
+    // TODO resolve hash in class body
     class vertex_hash_ = detail::hash_t<detail::vertex_type_t<edge_t, vertex_getter>>,
     class vertex_equal_to_ = detail::equal_to_t<detail::vertex_type_t<edge_t, vertex_getter>>
 >
