@@ -483,14 +483,25 @@ template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal
 inline bool digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::operator==( const digraph& rhs) const noexcept
 {
     const digraph& lhs = *this;
-    if (lhs.edges() != rhs.edges() || lhs.vertices() != rhs.vertices())return false;
+    if (lhs.edges().size() != rhs.edges().size() || lhs.vertices().size() != rhs.vertices().size())return false;
+    for (auto e_it = lhs.edges().begin(); e_it != lhs.edges().end(); ++e_it) {
+        auto rhs_e_it = rhs.edges().find( *e_it );
+        if (rhs_e_it == rhs.edges().end() || !edge_equal_to()(*e_it, *rhs_e_it)) return false;
+    }
+
+    for (auto v_it = lhs.vertices().begin(); v_it != lhs.vertices().end(); ++v_it) {
+        auto rhs_v_it = map_vertex( v_it, rhs.vertices() );
+        if (rhs_v_it == rhs.vertices().end() ||
+            !vertex_equal_to()(detail::do_derefence( *v_it ), detail::do_derefence( *rhs_v_it )) )return false;
+    }
+
     for(auto from_it = lhs.graph().begin(); from_it != lhs.graph().end();++from_it){
         auto rhs_from_it = map_vertex( from_it->first, rhs );
         if(rhs_from_it == rhs.graph().end() || from_it->second.size() != rhs_from_it->second.size())return false;
         for (auto to_it = from_it->second.begin(); to_it != from_it->second.end(); ++to_it) {
             auto rhs_to_it = rhs_from_it->second.find( map_vertex( to_it->first, rhs.vertices() ) );
-            if (rhs_to_it == rhs_from_it->second.end())return false;
-            if(!edge_equal_to()(detail::do_derefence( *to_it->second ), detail::do_derefence( *rhs_to_it->second )))return false;
+            if (rhs_to_it == rhs_from_it->second.end() ||
+                !edge_equal_to()(*to_it->second, *rhs_to_it->second) )return false;
         }
     }
     return true;

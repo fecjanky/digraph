@@ -125,5 +125,24 @@ TEST_CASE( "DiGraph can be copied and the contents are going to be equal", "[dig
     digraph_t g_a{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
     digraph_t g_b = g_a ;
     REQUIRE( g_a == g_b );
+    REQUIRE_FALSE( g_a != g_b );
+}
+
+TEST_CASE( "DiGraph (getter_by_value) can be copied and the contents are going to be equal", "[digraph]" )
+{
+    digraph_by_val_t g_a{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
+    digraph_by_val_t g_b = g_a;
+    REQUIRE( g_a == g_b );
     REQUIRE( !(g_a != g_b) );
 }
+
+TEST_CASE( "DiGraph equality comparison returns false if graphs are not made from the same edges", "[digraph]" )
+{
+    digraph_t g_a{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
+    digraph_t g_b{ { "A", "B" },{ "B","C" } ,{ "C","A" } };
+    
+    REQUIRE_FALSE( g_a == g_b );
+    REQUIRE( g_a != g_b );
+}
+
+
