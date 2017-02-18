@@ -11,6 +11,8 @@
 #include <cassert>
 #include <initializer_list>
 
+namespace digraph
+{
 
 template<typename T>
 struct TD;
@@ -20,170 +22,171 @@ class default_node_getter;
 
 namespace detail
 {
-    template<typename node_t>
-    struct node_type_impl
+template<typename node_t>
+struct node_type_impl
+{
+    using type = std::remove_cv_t<node_t>;
+    using is_value_type_t = std::true_type;
+    using underlying_type = type;
+};
+
+template<typename node_t>
+struct node_type_impl<node_t&>
+{
+    using type = std::reference_wrapper<node_t>;
+    using is_value_type_t = std::false_type;
+    using underlying_type = std::remove_cv_t<node_t>;
+};
+
+template<typename edge_t, class node_getter >
+struct node_type
+{
+    using ret_type = decltype(std::declval<node_getter>().begin( std::declval<edge_t>() ));
+    using ret_type_control = decltype(std::declval<node_getter>().end( std::declval<edge_t>() ));
+    static_assert(std::is_same < ret_type, ret_type_control>::value, "Edge begin end getter type mismatch");
+    using type = typename node_type_impl<ret_type>::type;
+    using underlying_type = typename node_type_impl<ret_type>::underlying_type;
+    using is_value_type_t = std::false_type;
+};
+
+
+template<typename edge_t, class node_getter = default_node_getter<edge_t> >
+using node_type_t = typename node_type<edge_t, node_getter>::type;
+
+template<typename edge_t, class node_getter = default_node_getter<edge_t> >
+using underlying_type_t = typename node_type<edge_t, node_getter>::underlying_type;
+
+
+template<typename T, class Hash, class EqualTo, class It>
+std::unordered_set<T, Hash, EqualTo> to_unique_set( It begin, It end )
+{
+    return std::unordered_set<T, Hash, EqualTo>( begin, end );
+}
+
+
+template<typename T>
+struct deref
+{
+    using type = T;
+};
+template<typename T>
+struct deref<std::reference_wrapper<T>>
+{
+    using type = typename deref<T>::type;
+};
+template<typename T>
+using deref_t = typename deref<T>::type;
+
+template<typename T>
+T& do_derefence( T& t )
+{
+    return t;
+}
+
+template<typename T>
+std::add_lvalue_reference_t<deref_t<T>> do_derefence( std::reference_wrapper<T> t )
+{
+    return do_derefence( t.get() );
+}
+
+template<typename T>
+struct has_hash_member_type
+{
+    template<typename TT>
+    static std::true_type check( const TT&, typename TT::hash* );
+    static std::false_type check( ... );
+    static constexpr bool value = std::is_same<decltype(check( std::declval<T>(), nullptr )), std::true_type>::value;
+};
+
+template<typename T>
+struct has_equal_to_member_type
+{
+    template<typename TT>
+    static std::true_type check( const TT&, typename TT::equal_to* );
+    static std::false_type check( ... );
+    static constexpr bool value = std::is_same<decltype(check( std::declval<T>(), nullptr )), std::true_type>::value;
+};
+
+template<typename T, bool B>
+struct select_hash
+{
+    using type = std::hash<T>;
+};
+
+template<typename T>
+struct select_hash<T, true>
+{
+    using type = typename T::hash;
+};
+
+template<typename T, bool B>
+struct select_equal_to
+{
+    using type = std::equal_to<T>;
+};
+
+template<typename T>
+struct select_equal_to<T, true>
+{
+    using type = typename T::equal_to;
+};
+
+
+template<typename T>
+using select_hash_t = typename select_hash<T, has_hash_member_type<T>::value>::type;
+
+template<typename T>
+using select_equal_to_t = typename select_equal_to<T, has_equal_to_member_type<T>::value>::type;
+
+template<typename T>
+struct unordered_traits
+{
+    using hash = select_hash_t<std::remove_cv_t<T>>;
+    using equal_to = select_equal_to_t<std::remove_cv_t<T>>;
+};
+
+template<typename T>
+struct unordered_traits<std::reference_wrapper<T>>
+{
+    struct hash
     {
-        using type = std::remove_cv_t<node_t>;
-        using is_value_type_t = std::true_type;
-        using underlying_type = type;
-    };
+        using hash_t = select_hash_t<std::remove_cv_t<T>>;
+        using type = decltype(std::declval<hash_t>()(std::declval<T>()));
 
-    template<typename node_t>
-    struct node_type_impl<node_t&>
-    {
-        using type = std::reference_wrapper<node_t>;
-        using is_value_type_t = std::false_type;
-        using underlying_type = std::remove_cv_t<node_t>;
-    };
-
-    template<typename edge_t, class node_getter >
-    struct node_type
-    {
-        using ret_type = decltype(std::declval<node_getter>().begin( std::declval<edge_t>() ));
-        using ret_type_control = decltype(std::declval<node_getter>().end( std::declval<edge_t>() ));
-        static_assert(std::is_same < ret_type, ret_type_control>::value, "Edge begin end getter type mismatch");
-        using type = typename node_type_impl<ret_type>::type;
-        using underlying_type = typename node_type_impl<ret_type>::underlying_type;
-        using is_value_type_t = std::false_type;
-    };
-
-
-    template<typename edge_t, class node_getter = default_node_getter<edge_t> >
-    using node_type_t = typename node_type<edge_t, node_getter>::type;
-
-    template<typename edge_t, class node_getter = default_node_getter<edge_t> >
-    using underlying_type_t = typename node_type<edge_t, node_getter>::underlying_type;
-
-
-    template<typename T,class Hash, class EqualTo,class It>
-    std::unordered_set<T, Hash, EqualTo> to_unique_set( It begin,It end )
-    {
-        return std::unordered_set<T, Hash, EqualTo>( begin, end );
-    }
-
-
-    template<typename T>
-    struct deref
-    {
-        using type = T;
-    };
-    template<typename T>
-    struct deref<std::reference_wrapper<T>>
-    {
-        using type = typename deref<T>::type;
-    };
-    template<typename T>
-    using deref_t = typename deref<T>::type;
-
-    template<typename T>
-    T& do_derefence( T& t )
-    {
-        return t;
-    }
-
-    template<typename T>
-    std::add_lvalue_reference_t<deref_t<T>> do_derefence( std::reference_wrapper<T> t )
-    {
-        return do_derefence( t.get() );
-    }
-
-    template<typename T>
-    struct has_hash_member_type
-    {
-        template<typename TT>
-        static std::true_type check( const TT&, typename TT::hash* );
-        static std::false_type check( ... );
-        static constexpr bool value = std::is_same<decltype(check( std::declval<T>(), nullptr )), std::true_type>::value;
-    };
-
-    template<typename T>
-    struct has_equal_to_member_type
-    {
-        template<typename TT>
-        static std::true_type check( const TT&, typename TT::equal_to* );
-        static std::false_type check( ... );
-        static constexpr bool value = std::is_same<decltype(check( std::declval<T>(), nullptr )), std::true_type>::value;
-    };
-
-    template<typename T, bool B>
-    struct select_hash
-    {
-        using type = std::hash<T>;
-    };
-
-    template<typename T>
-    struct select_hash<T, true>
-    {
-        using type = typename T::hash;
-    };
-
-    template<typename T, bool B>
-    struct select_equal_to
-    {
-        using type = std::equal_to<T>;
-    };
-
-    template<typename T>
-    struct select_equal_to<T, true>
-    {
-        using type = typename T::equal_to;
-    };
-
-
-    template<typename T>
-    using select_hash_t = typename select_hash<T, has_hash_member_type<T>::value>::type;
-
-    template<typename T>
-    using select_equal_to_t = typename select_equal_to<T, has_equal_to_member_type<T>::value>::type;
-
-    template<typename T>
-    struct unordered_traits
-    {
-        using hash = select_hash_t<std::remove_cv_t<T>>;
-        using equal_to = select_equal_to_t<std::remove_cv_t<T>>;
-    };
-
-    template<typename T>
-    struct unordered_traits<std::reference_wrapper<T>>
-    {
-        struct hash
+        type operator()( const T& t ) const
         {
-            using hash_t = select_hash_t<std::remove_cv_t<T>>;
-            using type = decltype(std::declval<hash_t>()(std::declval<T>()));
-
-            type operator()( const T& t ) const
-            {
-                return hash_t()(t);
-            }
-        };
-        struct equal_to
-        {
-            bool operator()( T& lhs, T& rhs ) const
-            {
-                return select_equal_to_t<T>()(lhs, rhs);
-            }
-        };
+            return hash_t()(t);
+        }
     };
-
-    template<typename T>
-    struct remove_reference_wrapper{
-        using type = T;
-    };
-
-    template<typename T>
-    struct remove_reference_wrapper<std::reference_wrapper<T>>
+    struct equal_to
     {
-        using type = T;
+        bool operator()( T& lhs, T& rhs ) const
+        {
+            return select_equal_to_t<T>()(lhs, rhs);
+        }
     };
+};
 
-    template<typename T>
-    using remove_reference_wrapper_t = typename remove_reference_wrapper<T>::type;
+template<typename T>
+struct remove_reference_wrapper
+{
+    using type = T;
+};
 
-    template<typename T>
-    using hash_t = typename unordered_traits<T>::hash;
+template<typename T>
+struct remove_reference_wrapper<std::reference_wrapper<T>>
+{
+    using type = T;
+};
 
-    template<typename T>
-    using equal_to_t = typename unordered_traits<T>::equal_to;
+template<typename T>
+using remove_reference_wrapper_t = typename remove_reference_wrapper<T>::type;
+
+template<typename T>
+using hash_t = typename unordered_traits<T>::hash;
+
+template<typename T>
+using equal_to_t = typename unordered_traits<T>::equal_to;
 
 }
 
@@ -216,9 +219,9 @@ public:
     using node_hash = node_hash_;
     using node_equal_to = node_equal_to_;
     using node_type = detail::node_type_t<edge_t, node_getter>;
-    using underlying_node_type = detail::underlying_type_t<edge_t,node_getter>;
-    using edge_container = std::unordered_set<edge_t,edge_hash,edge_equal_to>;
-    using node_container = std::unordered_set<node_type,node_hash,node_equal_to>;
+    using underlying_node_type = detail::underlying_type_t<edge_t, node_getter>;
+    using edge_container = std::unordered_set<edge_t, edge_hash, edge_equal_to>;
+    using node_container = std::unordered_set<node_type, node_hash, node_equal_to>;
     using node_iterator = typename node_container::iterator;
     using node_const_iterator = typename node_container::const_iterator;
     using edge_iterator = typename edge_container::iterator;
@@ -230,7 +233,7 @@ public:
 
     template<typename InputIterator>
     digraph( InputIterator begin, InputIterator end );
-    
+
     digraph( const std::initializer_list<edge_t>& );
 
     digraph( const digraph& other );
@@ -244,7 +247,10 @@ public:
     const node_container& nodes() const;
 
     /// Found if ret != edges().end()
+    node_iterator find( const underlying_node_type& _node );
     edge_iterator find( const underlying_node_type& _from, const underlying_node_type& _to );
+    node_const_iterator find( const underlying_node_type& _node ) const;
+    edge_const_iterator find( const underlying_node_type& _from, const underlying_node_type& _to ) const;
 
     //TODO: add iterator
     //TODO: add shortest path
@@ -268,7 +274,7 @@ private:
     {
         bool operator()( node_const_iterator lhs, node_const_iterator rhs ) const
         {
-            return node_equal_to()(detail::do_derefence( *lhs ),detail::do_derefence( *rhs ));
+            return node_equal_to()(detail::do_derefence( *lhs ), detail::do_derefence( *rhs ));
         }
     };
 
@@ -319,7 +325,7 @@ private:
 ///////////////////////
 
 template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::digraph( const std::initializer_list<edge_t>& list) : digraph(list.begin(),list.end())
+inline digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::digraph( const std::initializer_list<edge_t>& list ) : digraph( list.begin(), list.end() )
 {}
 
 template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
@@ -339,9 +345,9 @@ inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, no
     auto nodes = other._nodes;
     auto edges = other._edges;
     auto g = build_graph( edges, nodes );
-    swap(_edges ,edges);
-    swap(_nodes ,nodes);
-    swap(_g ,g);
+    swap( _edges, edges );
+    swap( _nodes, nodes );
+    swap( _g, g );
     return *this;
 }
 
@@ -387,8 +393,14 @@ inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, n
 }
 
 template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
+inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::find( const underlying_node_type& _node ) -> node_iterator
+{
+    return _nodes.find( node_type( _node ) );
+}
+
+template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
 inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::
-build_graph( const edge_container& edges, const node_container& nodes) -> graph_repr_t
+build_graph( const edge_container& edges, const node_container& nodes ) -> graph_repr_t
 {
     graph_repr_t g;
     for (auto edge_it = edges.begin(); edge_it != edges.end(); ++edge_it) {
@@ -399,7 +411,7 @@ build_graph( const edge_container& edges, const node_container& nodes) -> graph_
         auto end = std::find_if( nodes.begin(), nodes.end(),
             [&]( const auto& n ) { return node_equal_to()(n, node_getter::end( *edge_it )); } );
         assert( end != nodes.end() );
-        i.first->second.emplace( end , edge_it );
+        i.first->second.emplace( end, edge_it );
     }
     return g;
 }
@@ -412,16 +424,19 @@ inline void digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, no
 
 template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
 template<typename InputIterator>
-inline digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::digraph( InputIterator begin, InputIterator end ) : 
-    _edges( detail::to_unique_set<edge_t,edge_hash, edge_equal_to>( begin, end ) )
+inline digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::digraph( InputIterator begin, InputIterator end ) :
+    _edges( detail::to_unique_set<edge_t, edge_hash, edge_equal_to>( begin, end ) )
 {
     std::for_each( _edges.begin(), _edges.end(), [this]( const auto& e ) {
         _nodes.emplace( node_getter::begin( e ) );
         _nodes.emplace( node_getter::end( e ) );
     } );
-    _nodes = detail::to_unique_set<node_type, node_hash, node_equal_to>( _nodes.begin(),_nodes.end() );
+    _nodes = detail::to_unique_set<node_type, node_hash, node_equal_to>( _nodes.begin(), _nodes.end() );
     rebuild_graph();
 }
 
+
+
+}  //namespace digraph
 
 #endif  //DIGRAPH_DIGRAPH_H_INCLUDED__
