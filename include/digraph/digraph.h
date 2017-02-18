@@ -245,6 +245,9 @@ public:
     vertex_const_iterator find( const underlying_vertex_type& _vertex ) const;
     edge_const_iterator find( const underlying_vertex_type& _from, const underlying_vertex_type& _to ) const;
 
+    bool operator==( const digraph& ) const noexcept;
+    bool operator!=( const digraph& ) const noexcept;
+
 private:
     struct hash_vertex_iterator
     {
@@ -266,9 +269,18 @@ private:
 
     using graph_val_t = std::unordered_map<vertex_const_iterator, edge_const_iterator, hash_vertex_iterator, equal_to_vertex_iterator>;
     using graph_repr_t = std::unordered_map<vertex_const_iterator, graph_val_t, hash_vertex_iterator, equal_to_vertex_iterator>;
+    using graph_val_iterator = typename graph_val_t::iterator;
+    using graph_val_const_iterator = typename graph_val_t::const_iterator;
+    using graph_repr_iterator = typename graph_repr_t::iterator;
+    using graph_repr_const_iterator = typename graph_repr_t::const_iterator;
 
     static graph_repr_t build_graph( const edge_container&, const vertex_container& );
+    static vertex_const_iterator map_vertex( vertex_const_iterator from, const vertex_container& to );
+    static graph_repr_const_iterator map_vertex( vertex_const_iterator from, const digraph& to );
+
     void rebuild_graph();
+    graph_repr_t& graph() noexcept;
+    const graph_repr_t& graph() const noexcept;
 
     edge_container      _edges;
     vertex_container    _vertices;
@@ -316,8 +328,9 @@ inline digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, ver
 
 template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
 inline digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::digraph( const digraph & other ) :
-    _vertices( other._vertices ), _edges( other._edges ), _g( build_graph( _vertices, _edges ) )
-{}
+    _vertices( other._vertices ), _edges( other._edges ), _g( build_graph( _edges , _vertices ) )
+{
+}
 
 template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
 inline digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::digraph( digraph && other ) noexcept :
@@ -381,6 +394,17 @@ inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash
     return _vertices;
 }
 
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash_, class vertex_equal_to_>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash_, vertex_equal_to_>::graph() noexcept -> graph_repr_t &
+{
+    return _g;
+}
+
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash_, class vertex_equal_to_>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash_, vertex_equal_to_>::graph() const noexcept -> const graph_repr_t &
+{
+    return _g;
+}
 
 template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash_, class vertex_equal_to_>
 inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash_, vertex_equal_to_>::
@@ -441,6 +465,42 @@ inline digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, ver
     rebuild_graph();
 }
 
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::map_vertex( vertex_const_iterator from, const vertex_container& to ) -> vertex_const_iterator
+{
+    return to.find( *from );
+}
+
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::map_vertex( vertex_const_iterator from, const digraph& to ) -> graph_repr_const_iterator
+{
+    auto to_it = map_vertex( from, to.vertices() );
+    if (to_it == to.vertices().end())return to.graph().end();
+    return to.graph().find( to_it );
+}
+
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline bool digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::operator==( const digraph& rhs) const noexcept
+{
+    const digraph& lhs = *this;
+    if (lhs.edges() != rhs.edges() || lhs.vertices() != rhs.vertices())return false;
+    for(auto from_it = lhs.graph().begin(); from_it != lhs.graph().end();++from_it){
+        auto rhs_from_it = map_vertex( from_it->first, rhs );
+        if(rhs_from_it == rhs.graph().end() || from_it->second.size() != rhs_from_it->second.size())return false;
+        for (auto to_it = from_it->second.begin(); to_it != from_it->second.end(); ++to_it) {
+            auto rhs_to_it = rhs_from_it->second.find( map_vertex( to_it->first, rhs.vertices() ) );
+            if (rhs_to_it == rhs_from_it->second.end())return false;
+            if(!edge_equal_to()(detail::do_derefence( *to_it->second ), detail::do_derefence( *rhs_to_it->second )))return false;
+        }
+    }
+    return true;
+}
+
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline bool digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::operator!=( const digraph& rhs ) const noexcept
+{
+    return !(*this == rhs);
+}
 
 
 }  //namespace digraph

@@ -118,3 +118,12 @@ TEST_CASE( "DiGraph (vertices getter by value) created from elems contains the e
     REQUIRE( edge_c_a->to == "A" );
 
 }
+
+
+TEST_CASE( "DiGraph can be copied and the contents are going to be equal", "[digraph]" )
+{
+    digraph_t g_a{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
+    digraph_t g_b = g_a ;
+    REQUIRE( g_a == g_b );
+    REQUIRE( !(g_a != g_b) );
+}
