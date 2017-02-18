@@ -243,12 +243,13 @@ public:
 
     void swap( digraph& other ) noexcept;
 
-    const edge_container& edges() const;
-    const node_container& nodes() const;
+    edge_container& edges() noexcept;
+    node_container& nodes() noexcept;
+    const edge_container& edges() const noexcept;
+    const node_container& nodes() const noexcept;
+
 
     /// Found if ret != edges().end()
-    node_iterator find( const underlying_node_type& _node );
-    edge_iterator find( const underlying_node_type& _from, const underlying_node_type& _to );
     node_const_iterator find( const underlying_node_type& _node ) const;
     edge_const_iterator find( const underlying_node_type& _from, const underlying_node_type& _to ) const;
 
@@ -372,28 +373,46 @@ inline void digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, no
 }
 
 template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::edges() const -> const edge_container &
+inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::edges() const noexcept -> const edge_container &
 {
     return _edges;
 }
 
 template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::nodes() const -> const node_container &
+inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::nodes() const noexcept -> const node_container &
 {
     return _nodes;
 }
 
 template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::find( const underlying_node_type & _from, const underlying_node_type & _to ) -> edge_iterator
+inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::edges() noexcept -> edge_container &
 {
-    auto from = _nodes.find( node_type( _from ) );
-    auto to = _nodes.find( node_type( _to ) );
+    return _edges;
+}
+
+template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
+inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::nodes() noexcept -> node_container &
+{
+    return _nodes;
+}
+
+
+template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
+inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::
+find( const underlying_node_type & _from, const underlying_node_type & _to ) const -> edge_const_iterator
+{
+    const auto from = _nodes.find( node_type( _from ) );
+    const auto to = _nodes.find( node_type( _to ) );
     if (from == _nodes.end() || to == _nodes.end())return _edges.end();
-    else return _g[from][to];
+    const auto g_from = _g.find( from );
+    if (g_from == _g.end())return _edges.end();
+    const auto g_to = g_from->second.find( to );
+    if (g_to == g_from->second.end())return _edges.end();
+    return g_to->second;
 }
 
 template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::find( const underlying_node_type& _node ) -> node_iterator
+inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::find( const underlying_node_type& _node ) const -> node_const_iterator
 {
     return _nodes.find( node_type( _node ) );
 }
