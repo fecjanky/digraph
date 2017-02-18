@@ -37,7 +37,11 @@ struct vertex_type_impl<std::reference_wrapper<vertex_t>>
 };
 
 template<typename T>
-struct get_vertex_type;
+struct get_vertex_type
+{
+    struct vertices_getter_must_return_a_pair_of_something;
+    using type = vertices_getter_must_return_a_pair_of_something;
+};
 
 template<typename T>
 struct get_vertex_type < std::pair<T, T> >
@@ -66,99 +70,53 @@ using underlying_type_t = typename vertex_type<edge_t, vertex_getter>::underlyin
 
 
 template<typename T, class Hash, class EqualTo, class It>
-std::unordered_set<T, Hash, EqualTo> to_unique_set( It begin, It end )
+inline std::unordered_set<T, Hash, EqualTo> to_unique_set( It begin, It end )
 {
     return std::unordered_set<T, Hash, EqualTo>( begin, end );
 }
 
 
 template<typename T>
-struct deref
+struct remove_reference_wrapper
 {
     using type = T;
 };
-template<typename T>
-struct deref<std::reference_wrapper<T>>
-{
-    using type = typename deref<T>::type;
-};
-template<typename T>
-using deref_t = typename deref<T>::type;
 
 template<typename T>
-T& do_derefence( T& t )
+struct remove_reference_wrapper<std::reference_wrapper<T>>
+{
+    using type = typename remove_reference_wrapper<T>::type;
+};
+
+template<typename T>
+using remove_reference_wrapper_t = typename remove_reference_wrapper<T>::type;
+
+
+template<typename T>
+inline T& derefence( T& t )
 {
     return t;
 }
 
 template<typename T>
-std::add_lvalue_reference_t<deref_t<T>> do_derefence( std::reference_wrapper<T> t )
+inline std::add_lvalue_reference_t<remove_reference_wrapper_t<T>> derefence( std::reference_wrapper<T> t )
 {
-    return t.get();
+    return derefence(t.get());
 }
 
-template<typename T>
-struct has_hash_member_type
-{
-    template<typename TT>
-    static std::true_type check( const TT&, typename TT::hash* );
-    static std::false_type check( ... );
-    static constexpr bool value = std::is_same<decltype(check( std::declval<T>(), nullptr )), std::true_type>::value;
-};
-
-template<typename T>
-struct has_equal_to_member_type
-{
-    template<typename TT>
-    static std::true_type check( const TT&, typename TT::equal_to* );
-    static std::false_type check( ... );
-    static constexpr bool value = std::is_same<decltype(check( std::declval<T>(), nullptr )), std::true_type>::value;
-};
-
-template<typename T, bool B>
-struct select_hash
-{
-    using type = std::hash<T>;
-};
-
-template<typename T>
-struct select_hash<T, true>
-{
-    using type = typename T::hash;
-};
-
-template<typename T, bool B>
-struct select_equal_to
-{
-    using type = std::equal_to<T>;
-};
-
-template<typename T>
-struct select_equal_to<T, true>
-{
-    using type = typename T::equal_to;
-};
-
-
-template<typename T>
-using select_hash_t = typename select_hash<T, has_hash_member_type<T>::value>::type;
-
-template<typename T>
-using select_equal_to_t = typename select_equal_to<T, has_equal_to_member_type<T>::value>::type;
-
-template<typename T>
+template<typename T,class Hash,class EqualTo>
 struct unordered_traits
 {
-    using hash = select_hash_t<std::remove_cv_t<T>>;
-    using equal_to = select_equal_to_t<std::remove_cv_t<T>>;
+    using hash = Hash;
+    using equal_to = EqualTo;
 };
 
-template<typename T>
-struct unordered_traits<std::reference_wrapper<T>>
+template<typename T, class Hash, class EqualTo>
+struct unordered_traits<std::reference_wrapper<T>,Hash,EqualTo>
 {
     struct hash
     {
-        using hash_t = select_hash_t<std::remove_cv_t<T>>;
+        using hash_t = Hash;
         using type = decltype(std::declval<hash_t>()(std::declval<T>()));
 
         type operator()( const T& t ) const
@@ -170,31 +128,16 @@ struct unordered_traits<std::reference_wrapper<T>>
     {
         bool operator()( T& lhs, T& rhs ) const
         {
-            return select_equal_to_t<T>()(lhs, rhs);
+            return EqualTo()(lhs, rhs);
         }
     };
 };
 
-template<typename T>
-struct remove_reference_wrapper
-{
-    using type = T;
-};
+template<typename T,typename Hash>
+using hash_t = typename unordered_traits < T, Hash, std::equal_to<size_t> > ::hash;
 
-template<typename T>
-struct remove_reference_wrapper<std::reference_wrapper<T>>
-{
-    using type = T;
-};
-
-template<typename T>
-using remove_reference_wrapper_t = typename remove_reference_wrapper<T>::type;
-
-template<typename T>
-using hash_t = typename unordered_traits<T>::hash;
-
-template<typename T>
-using equal_to_t = typename unordered_traits<T>::equal_to;
+template<typename T,typename EqualTo>
+using equal_to_t = typename unordered_traits < T, std::hash<size_t>, EqualTo>::equal_to;
 
 }
 
@@ -202,18 +145,17 @@ using equal_to_t = typename unordered_traits<T>::equal_to;
 template<
     typename edge_t,
     class vertex_getter,
-    class edge_hash = detail::hash_t<edge_t>,
-    class edge_equal_to = detail::equal_to_t<edge_t>,
-    // TODO resolve hash in class body
-    class vertex_hash_ = detail::hash_t<detail::vertex_type_t<edge_t, vertex_getter>>,
-    class vertex_equal_to_ = detail::equal_to_t<detail::vertex_type_t<edge_t, vertex_getter>>
+    class edge_hash         = detail::hash_t<edge_t>,
+    class edge_equal_to     = detail::equal_to_t<edge_t>,
+    class vertex_hash_      = std::hash<std::remove_cv_t<detail::underlying_type_t<edge_t, vertex_getter>>>,
+    class vertex_equal_to_  = std::equal_to<detail::underlying_type_t<edge_t, vertex_getter>>
 >
 class digraph
 {
 public:
-    using vertex_hash = vertex_hash_;
-    using vertex_equal_to = vertex_equal_to_;
     using vertex_type = detail::vertex_type_t<edge_t, vertex_getter>;
+    using vertex_hash = detail::hash_t<vertex_type,vertex_hash_>;
+    using vertex_equal_to = detail::equal_to_t<vertex_type,vertex_equal_to_>;
     using underlying_vertex_type = detail::underlying_type_t<edge_t, vertex_getter>;
     using edge_container = std::unordered_set<edge_t, edge_hash, edge_equal_to>;
     using vertex_container = std::unordered_set<vertex_type, vertex_hash, vertex_equal_to>;
@@ -256,7 +198,7 @@ private:
 
         has_ret_type operator()( vertex_const_iterator i ) const
         {
-            return vertex_hash()(detail::do_derefence( *i ));
+            return vertex_hash()(detail::derefence( *i ));
         }
     };
 
@@ -264,7 +206,7 @@ private:
     {
         bool operator()( vertex_const_iterator lhs, vertex_const_iterator rhs ) const
         {
-            return vertex_equal_to()(detail::do_derefence( *lhs ), detail::do_derefence( *rhs ));
+            return vertex_equal_to()(detail::derefence( *lhs ), detail::derefence( *rhs ));
         }
     };
 
@@ -413,8 +355,9 @@ inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash
 find( const underlying_vertex_type & _from, const underlying_vertex_type & _to ) const -> edge_const_iterator
 {
     const auto from = _vertices.find( vertex_type( _from ) );
+    if (from == _vertices.end())return _edges.end();
     const auto to = _vertices.find( vertex_type( _to ) );
-    if (from == _vertices.end() || to == _vertices.end())return _edges.end();
+    if(to == _vertices.end())return _edges.end();
     const auto g_from = _g.find( from );
     if (g_from == _g.end())return _edges.end();
     const auto g_to = g_from->second.find( to );
@@ -494,7 +437,7 @@ inline bool digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash
     for (auto v_it = lhs.vertices().begin(); v_it != lhs.vertices().end(); ++v_it) {
         auto rhs_v_it = map_vertex( v_it, rhs.vertices() );
         if (rhs_v_it == rhs.vertices().end() ||
-            !vertex_equal_to()(detail::do_derefence( *v_it ), detail::do_derefence( *rhs_v_it )) )return false;
+            !vertex_equal_to()(detail::derefence( *v_it ), detail::derefence( *rhs_v_it )) )return false;
     }
 
     for(auto from_it = lhs.graph().begin(); from_it != lhs.graph().end();++from_it){
