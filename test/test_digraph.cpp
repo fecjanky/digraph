@@ -39,12 +39,56 @@ struct getvertices_MyType
 
 };
 
+struct getvertices_by_value_MyType
+{
+    std::pair<std::string, std::string> operator()( const MyType& t ) const
+    {
+        return std::make_pair( t.from,t.to );
+    }
+
+};
+
+
 
 using digraph_t = digraph::digraph<MyType, getvertices_MyType, hash_MyType, equal_to_MyType>;
+using digraph_by_val_t = digraph::digraph<MyType, getvertices_by_value_MyType, hash_MyType, equal_to_MyType>;
 
 TEST_CASE( "DiGraph created from elems contains the edges and vertices that it was created from", "[digraph]" )
 {
     digraph_t g{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
+    auto edge_a_b = g.find( "A", "B" );
+    auto edge_b_c = g.find( "B", "C" );
+    auto edge_b_a = g.find( "B", "A" );
+    auto edge_c_a = g.find( "C", "A" );
+    auto edge_d_a = g.find( "D", "A" );
+
+    REQUIRE( g.vertices().size() == 3 );
+
+    REQUIRE( g.find( "A" ) != g.vertices().end() );
+    REQUIRE( g.find( "B" ) != g.vertices().end() );
+    REQUIRE( g.find( "C" ) != g.vertices().end() );
+    REQUIRE( g.find( "D" ) == g.vertices().end() );
+
+    REQUIRE( edge_a_b != g.edges().end() );
+    REQUIRE( edge_b_c != g.edges().end() );
+    REQUIRE( edge_b_a != g.edges().end() );
+    REQUIRE( edge_c_a != g.edges().end() );
+    REQUIRE( edge_d_a == g.edges().end() );
+
+    REQUIRE( edge_a_b->from == "A" );
+    REQUIRE( edge_a_b->to == "B" );
+    REQUIRE( edge_b_c->from == "B" );
+    REQUIRE( edge_b_c->to == "C" );
+    REQUIRE( edge_b_a->from == "B" );
+    REQUIRE( edge_b_a->to == "A" );
+    REQUIRE( edge_c_a->from == "C" );
+    REQUIRE( edge_c_a->to == "A" );
+
+}
+
+TEST_CASE( "DiGraph (vertices getter by value) created from elems contains the edges and vertices that it was created from", "[digraph]" )
+{
+    digraph_by_val_t g{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
     auto edge_a_b = g.find( "A", "B" );
     auto edge_b_c = g.find( "B", "C" );
     auto edge_b_a = g.find( "B", "A" );
