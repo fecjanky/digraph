@@ -18,9 +18,6 @@ namespace digraph
 template<typename T>
 struct TD;
 
-template<typename T>
-class default_vertex_getter;
-
 namespace detail
 {
 template<typename vertex_t>
@@ -43,7 +40,7 @@ template<typename T>
 struct get_vertex_type;
 
 template<typename T>
-struct get_vertex_type < std::pair<T,T> >
+struct get_vertex_type < std::pair<T, T> >
 {
     using type = T;
 };
@@ -54,17 +51,17 @@ using get_vertex_type_t = typename get_vertex_type<T>::type;
 template<typename edge_t, class vertex_getter >
 struct vertex_type
 {
-    using ret_type = decltype(std::declval<vertex_getter>()( std::declval<edge_t>() ));
+    using ret_type = decltype(std::declval<vertex_getter>()(std::declval<edge_t>()));
     using vertex_t = get_vertex_type_t<std::remove_cv_t<std::remove_reference_t<ret_type>>>;
     using type = typename vertex_type_impl<vertex_t>::type;
     using underlying_type = typename vertex_type_impl<vertex_t>::underlying_type;
 };
 
 
-template<typename edge_t, class vertex_getter = default_vertex_getter<edge_t> >
+template<typename edge_t, class vertex_getter >
 using vertex_type_t = typename vertex_type<edge_t, vertex_getter>::type;
 
-template<typename edge_t, class vertex_getter = default_vertex_getter<edge_t> >
+template<typename edge_t, class vertex_getter >
 using underlying_type_t = typename vertex_type<edge_t, vertex_getter>::underlying_type;
 
 
@@ -97,7 +94,7 @@ T& do_derefence( T& t )
 template<typename T>
 std::add_lvalue_reference_t<deref_t<T>> do_derefence( std::reference_wrapper<T> t )
 {
-    return do_derefence( t.get() );
+    return t.get();
 }
 
 template<typename T>
@@ -245,22 +242,13 @@ public:
     const edge_container& edges() const noexcept;
     const vertex_container& vertices() const noexcept;
 
-
-    /// Found if ret != edges().end()
     vertex_const_iterator find( const underlying_vertex_type& _vertex ) const;
     edge_const_iterator find( const underlying_vertex_type& _from, const underlying_vertex_type& _to ) const;
-
-    //TODO: add iterator
-    //TODO: add shortest path
 
 private:
     struct hash_vertex_iterator
     {
-        template<typename T>
-        using underlying_t = detail::deref_t< typename T::value_type >;
-
-        //using has_ret_type = decltype(std::declval<vertex_hash>()(std::declval<underlying_t>()));
-        using has_ret_type = size_t;
+        using has_ret_type = decltype(std::declval<vertex_hash>()(std::declval<underlying_vertex_type>()));
 
         has_ret_type operator()( vertex_const_iterator i ) const
         {
@@ -282,9 +270,9 @@ private:
     static graph_repr_t build_graph( const edge_container&, const vertex_container& );
     void rebuild_graph();
 
-    edge_container     _edges;
-    vertex_container     _vertices;
-    graph_repr_t    _g;
+    edge_container      _edges;
+    vertex_container    _vertices;
+    graph_repr_t        _g;
 };
 
 template<typename DiGraphT>
