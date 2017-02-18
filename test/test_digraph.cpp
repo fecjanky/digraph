@@ -29,22 +29,20 @@ struct equal_to_MyType
     }
 };
 
-struct getnodes_MyType
+struct getvertices_MyType
 {
-    static const std::string& begin( const MyType& t )
+    using str_const_ref = std::reference_wrapper<const std::string>;
+    std::pair<str_const_ref, str_const_ref> operator()( const MyType& t ) const
     {
-        return t.from;
+        return std::make_pair( std::ref( t.from ), std::ref( t.to ));
     }
-    static const std::string& end( const MyType& t )
-    {
-        return t.to;
-    }
+
 };
 
 
-using digraph_t = digraph::digraph<MyType, getnodes_MyType, hash_MyType, equal_to_MyType>;
+using digraph_t = digraph::digraph<MyType, getvertices_MyType, hash_MyType, equal_to_MyType>;
 
-TEST_CASE( "DiGraph created from elems contains the edges and nodes that it was created from", "[digraph]" )
+TEST_CASE( "DiGraph created from elems contains the edges and vertices that it was created from", "[digraph]" )
 {
     digraph_t g{ { "A", "B" },{ "B","C" } ,{ "C","A" },{ "B","A" } };
     auto edge_a_b = g.find( "A", "B" );
@@ -53,12 +51,12 @@ TEST_CASE( "DiGraph created from elems contains the edges and nodes that it was 
     auto edge_c_a = g.find( "C", "A" );
     auto edge_d_a = g.find( "D", "A" );
 
-    REQUIRE( g.nodes().size() == 3 );
+    REQUIRE( g.vertices().size() == 3 );
 
-    REQUIRE( g.find( "A" ) != g.nodes().end() );
-    REQUIRE( g.find( "B" ) != g.nodes().end() );
-    REQUIRE( g.find( "C" ) != g.nodes().end() );
-    REQUIRE( g.find( "D" ) == g.nodes().end() );
+    REQUIRE( g.find( "A" ) != g.vertices().end() );
+    REQUIRE( g.find( "B" ) != g.vertices().end() );
+    REQUIRE( g.find( "C" ) != g.vertices().end() );
+    REQUIRE( g.find( "D" ) == g.vertices().end() );
 
     REQUIRE( edge_a_b != g.edges().end() );
     REQUIRE( edge_b_c != g.edges().end() );

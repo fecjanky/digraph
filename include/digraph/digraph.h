@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
+#include <utility>
 #include <functional>
 #include <iterator>
 #include <cassert>
@@ -18,43 +19,53 @@ template<typename T>
 struct TD;
 
 template<typename T>
-class default_node_getter;
+class default_vertex_getter;
 
 namespace detail
 {
-template<typename node_t>
-struct node_type_impl
+template<typename vertex_t>
+struct vertex_type_impl
 {
-    using type = std::remove_cv_t<node_t>;
-    using is_value_type_t = std::true_type;
+    using type = std::remove_cv_t<vertex_t>;
     using underlying_type = type;
+    using is_value_type_t = std::true_type;
 };
 
-template<typename node_t>
-struct node_type_impl<node_t&>
+template<typename vertex_t>
+struct vertex_type_impl<std::reference_wrapper<vertex_t>>
 {
-    using type = std::reference_wrapper<node_t>;
-    using is_value_type_t = std::false_type;
-    using underlying_type = std::remove_cv_t<node_t>;
-};
-
-template<typename edge_t, class node_getter >
-struct node_type
-{
-    using ret_type = decltype(std::declval<node_getter>().begin( std::declval<edge_t>() ));
-    using ret_type_control = decltype(std::declval<node_getter>().end( std::declval<edge_t>() ));
-    static_assert(std::is_same < ret_type, ret_type_control>::value, "Edge begin end getter type mismatch");
-    using type = typename node_type_impl<ret_type>::type;
-    using underlying_type = typename node_type_impl<ret_type>::underlying_type;
+    using type = std::reference_wrapper<vertex_t>;
+    using underlying_type = vertex_t;
     using is_value_type_t = std::false_type;
 };
 
+template<typename T>
+struct get_vertex_type;
 
-template<typename edge_t, class node_getter = default_node_getter<edge_t> >
-using node_type_t = typename node_type<edge_t, node_getter>::type;
+template<typename T>
+struct get_vertex_type < std::pair<T,T> >
+{
+    using type = T;
+};
 
-template<typename edge_t, class node_getter = default_node_getter<edge_t> >
-using underlying_type_t = typename node_type<edge_t, node_getter>::underlying_type;
+template<typename T>
+using get_vertex_type_t = typename get_vertex_type<T>::type;
+
+template<typename edge_t, class vertex_getter >
+struct vertex_type
+{
+    using ret_type = decltype(std::declval<vertex_getter>()( std::declval<edge_t>() ));
+    using vertex_t = get_vertex_type_t<std::remove_cv_t<std::remove_reference_t<ret_type>>>;
+    using type = typename vertex_type_impl<vertex_t>::type;
+    using underlying_type = typename vertex_type_impl<vertex_t>::underlying_type;
+};
+
+
+template<typename edge_t, class vertex_getter = default_vertex_getter<edge_t> >
+using vertex_type_t = typename vertex_type<edge_t, vertex_getter>::type;
+
+template<typename edge_t, class vertex_getter = default_vertex_getter<edge_t> >
+using underlying_type_t = typename vertex_type<edge_t, vertex_getter>::underlying_type;
 
 
 template<typename T, class Hash, class EqualTo, class It>
@@ -190,40 +201,26 @@ using equal_to_t = typename unordered_traits<T>::equal_to;
 
 }
 
-template<typename T>
-class default_node_getter
-{
-public:
-    static decltype(auto) begin( const T& t )
-    {
-        return t.begin();
-    }
-    static decltype(auto) end( const T& t )
-    {
-        return t.end();
-    }
-};
-
 
 template<
     typename edge_t,
-    class node_getter = default_node_getter<edge_t>,
+    class vertex_getter,
     class edge_hash = detail::hash_t<edge_t>,
     class edge_equal_to = detail::equal_to_t<edge_t>,
-    class node_hash_ = detail::hash_t<detail::node_type_t<edge_t, node_getter>>,
-    class node_equal_to_ = detail::equal_to_t<detail::node_type_t<edge_t, node_getter>>
+    class vertex_hash_ = detail::hash_t<detail::vertex_type_t<edge_t, vertex_getter>>,
+    class vertex_equal_to_ = detail::equal_to_t<detail::vertex_type_t<edge_t, vertex_getter>>
 >
 class digraph
 {
 public:
-    using node_hash = node_hash_;
-    using node_equal_to = node_equal_to_;
-    using node_type = detail::node_type_t<edge_t, node_getter>;
-    using underlying_node_type = detail::underlying_type_t<edge_t, node_getter>;
+    using vertex_hash = vertex_hash_;
+    using vertex_equal_to = vertex_equal_to_;
+    using vertex_type = detail::vertex_type_t<edge_t, vertex_getter>;
+    using underlying_vertex_type = detail::underlying_type_t<edge_t, vertex_getter>;
     using edge_container = std::unordered_set<edge_t, edge_hash, edge_equal_to>;
-    using node_container = std::unordered_set<node_type, node_hash, node_equal_to>;
-    using node_iterator = typename node_container::iterator;
-    using node_const_iterator = typename node_container::const_iterator;
+    using vertex_container = std::unordered_set<vertex_type, vertex_hash, vertex_equal_to>;
+    using vertex_iterator = typename vertex_container::iterator;
+    using vertex_const_iterator = typename vertex_container::const_iterator;
     using edge_iterator = typename edge_container::iterator;
     using edge_const_iterator = typename edge_container::const_iterator;
 
@@ -244,49 +241,49 @@ public:
     void swap( digraph& other ) noexcept;
 
     edge_container& edges() noexcept;
-    node_container& nodes() noexcept;
+    vertex_container& vertices() noexcept;
     const edge_container& edges() const noexcept;
-    const node_container& nodes() const noexcept;
+    const vertex_container& vertices() const noexcept;
 
 
     /// Found if ret != edges().end()
-    node_const_iterator find( const underlying_node_type& _node ) const;
-    edge_const_iterator find( const underlying_node_type& _from, const underlying_node_type& _to ) const;
+    vertex_const_iterator find( const underlying_vertex_type& _vertex ) const;
+    edge_const_iterator find( const underlying_vertex_type& _from, const underlying_vertex_type& _to ) const;
 
     //TODO: add iterator
     //TODO: add shortest path
 
 private:
-    struct hash_node_iterator
+    struct hash_vertex_iterator
     {
         template<typename T>
         using underlying_t = detail::deref_t< typename T::value_type >;
 
-        //using has_ret_type = decltype(std::declval<node_hash>()(std::declval<underlying_t>()));
+        //using has_ret_type = decltype(std::declval<vertex_hash>()(std::declval<underlying_t>()));
         using has_ret_type = size_t;
 
-        has_ret_type operator()( node_const_iterator i ) const
+        has_ret_type operator()( vertex_const_iterator i ) const
         {
-            return node_hash()(detail::do_derefence( *i ));
+            return vertex_hash()(detail::do_derefence( *i ));
         }
     };
 
-    struct equal_to_node_iterator
+    struct equal_to_vertex_iterator
     {
-        bool operator()( node_const_iterator lhs, node_const_iterator rhs ) const
+        bool operator()( vertex_const_iterator lhs, vertex_const_iterator rhs ) const
         {
-            return node_equal_to()(detail::do_derefence( *lhs ), detail::do_derefence( *rhs ));
+            return vertex_equal_to()(detail::do_derefence( *lhs ), detail::do_derefence( *rhs ));
         }
     };
 
-    using graph_val_t = std::unordered_map<node_const_iterator, edge_const_iterator, hash_node_iterator, equal_to_node_iterator>;
-    using graph_repr_t = std::unordered_map<node_const_iterator, graph_val_t, hash_node_iterator, equal_to_node_iterator>;
+    using graph_val_t = std::unordered_map<vertex_const_iterator, edge_const_iterator, hash_vertex_iterator, equal_to_vertex_iterator>;
+    using graph_repr_t = std::unordered_map<vertex_const_iterator, graph_val_t, hash_vertex_iterator, equal_to_vertex_iterator>;
 
-    static graph_repr_t build_graph( const edge_container&, const node_container& );
+    static graph_repr_t build_graph( const edge_container&, const vertex_container& );
     void rebuild_graph();
 
     edge_container     _edges;
-    node_container     _nodes;
+    vertex_container     _vertices;
     graph_repr_t    _g;
 };
 
@@ -301,23 +298,23 @@ private:
     struct get_digraph_type<digraph<T...>>
     {
         using type = digraph<T...>;
-        using node_ptr = typename type::node_iterator;
+        using vertex_ptr = typename type::vertex_iterator;
     };
     template<typename... T>
     struct get_digraph_type<const digraph<T...>>
     {
         using type = const digraph<T...>;
-        using node_ptr = typename type::node_const_iterator;
+        using vertex_ptr = typename type::vertex_const_iterator;
     };
-    using node_ptr = typename get_digraph_type<DiGraphT>::node_ptr;
+    using vertex_ptr = typename get_digraph_type<DiGraphT>::vertex_ptr;
     using graph_ptr = std::add_pointer_t<typename get_digraph_type<DiGraphT>::type>;
 public:
-    explicit digraph_iterator( node_ptr n = nullptr, graph_ptr g = nullptr ) : _node( n ), _g( g ) {}
+    explicit digraph_iterator( vertex_ptr n = nullptr, graph_ptr g = nullptr ) : _vertex( n ), _g( g ) {}
     digraph_iterator( const digraph_iterator & ) = default;
     digraph_iterator& operator= ( const digraph_iterator & ) = default;
 
 private:
-    node_ptr _node;
+    vertex_ptr _vertex;
     graph_ptr _g;
 };
 
@@ -325,85 +322,85 @@ private:
 ///////////////////////
 ///////////////////////
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::digraph( const std::initializer_list<edge_t>& list ) : digraph( list.begin(), list.end() )
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::digraph( const std::initializer_list<edge_t>& list ) : digraph( list.begin(), list.end() )
 {}
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::digraph( const digraph & other ) :
-    _nodes( other._nodes ), _edges( other._edges ), _g( build_graph( _nodes, _edges ) )
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::digraph( const digraph & other ) :
+    _vertices( other._vertices ), _edges( other._edges ), _g( build_graph( _vertices, _edges ) )
 {}
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::digraph( digraph && other ) noexcept :
-    _nodes( std::move( other._nodes ) ), _edges( std::move( other._edges ) ), _g( std::move( other._g ) )
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::digraph( digraph && other ) noexcept :
+    _vertices( std::move( other._vertices ) ), _edges( std::move( other._edges ) ), _g( std::move( other._g ) )
 {}
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::operator=( const digraph & other ) -> digraph &
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::operator=( const digraph & other ) -> digraph &
 {
     using std::swap;
-    auto nodes = other._nodes;
+    auto vertices = other._vertices;
     auto edges = other._edges;
-    auto g = build_graph( edges, nodes );
+    auto g = build_graph( edges, vertices );
     swap( _edges, edges );
-    swap( _nodes, nodes );
+    swap( _vertices, vertices );
     swap( _g, g );
     return *this;
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::operator=( digraph && other ) noexcept -> digraph &
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::operator=( digraph && other ) noexcept -> digraph &
 {
     using std::swap;
     if (this != &other) {
         _edges = std::move( other._edges );
-        _nodes = std::move( other._nodes );
+        _vertices = std::move( other._vertices );
         _g = std::move( other._g );
     }
     return *this;
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline void digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::swap( digraph & other ) noexcept
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline void digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::swap( digraph & other ) noexcept
 {
     swap( _edges, other._edges );
-    swap( _nodes, other._nodes );
+    swap( _vertices, other._vertices );
     swap( _g, other._g );
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::edges() const noexcept -> const edge_container &
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash_, class vertex_equal_to_>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash_, vertex_equal_to_>::edges() const noexcept -> const edge_container &
 {
     return _edges;
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::nodes() const noexcept -> const node_container &
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash_, class vertex_equal_to_>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash_, vertex_equal_to_>::vertices() const noexcept -> const vertex_container &
 {
-    return _nodes;
+    return _vertices;
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::edges() noexcept -> edge_container &
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash_, class vertex_equal_to_>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash_, vertex_equal_to_>::edges() noexcept -> edge_container &
 {
     return _edges;
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::nodes() noexcept -> node_container &
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash_, class vertex_equal_to_>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash_, vertex_equal_to_>::vertices() noexcept -> vertex_container &
 {
-    return _nodes;
+    return _vertices;
 }
 
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash_, class node_equal_to_>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash_, node_equal_to_>::
-find( const underlying_node_type & _from, const underlying_node_type & _to ) const -> edge_const_iterator
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash_, class vertex_equal_to_>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash_, vertex_equal_to_>::
+find( const underlying_vertex_type & _from, const underlying_vertex_type & _to ) const -> edge_const_iterator
 {
-    const auto from = _nodes.find( node_type( _from ) );
-    const auto to = _nodes.find( node_type( _to ) );
-    if (from == _nodes.end() || to == _nodes.end())return _edges.end();
+    const auto from = _vertices.find( vertex_type( _from ) );
+    const auto to = _vertices.find( vertex_type( _to ) );
+    if (from == _vertices.end() || to == _vertices.end())return _edges.end();
     const auto g_from = _g.find( from );
     if (g_from == _g.end())return _edges.end();
     const auto g_to = g_from->second.find( to );
@@ -411,46 +408,48 @@ find( const underlying_node_type & _from, const underlying_node_type & _to ) con
     return g_to->second;
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::find( const underlying_node_type& _node ) const -> node_const_iterator
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::find( const underlying_vertex_type& _vertex ) const -> vertex_const_iterator
 {
-    return _nodes.find( node_type( _node ) );
+    return _vertices.find( vertex_type( _vertex ) );
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline auto digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::
-build_graph( const edge_container& edges, const node_container& nodes ) -> graph_repr_t
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline auto digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::
+build_graph( const edge_container& edges, const vertex_container& vertices ) -> graph_repr_t
 {
     graph_repr_t g;
     for (auto edge_it = edges.begin(); edge_it != edges.end(); ++edge_it) {
-        auto begin = std::find_if( nodes.begin(), nodes.end(),
-            [&]( const auto& n ) { return node_equal_to()(n, node_getter::begin( *edge_it )); } );
-        assert( begin != nodes.end() );
+        const auto curr_vertices = vertex_getter()(*edge_it);
+        auto begin = std::find_if( vertices.begin(), vertices.end(),
+            [&]( const auto& n ) { return vertex_equal_to()(n, curr_vertices.first); } );
+        assert( begin != vertices.end() );
         auto i = g.emplace( begin, graph_val_t{} );
-        auto end = std::find_if( nodes.begin(), nodes.end(),
-            [&]( const auto& n ) { return node_equal_to()(n, node_getter::end( *edge_it )); } );
-        assert( end != nodes.end() );
+        auto end = std::find_if( vertices.begin(), vertices.end(),
+            [&]( const auto& n ) { return vertex_equal_to()(n, curr_vertices.second); } );
+        assert( end != vertices.end() );
         i.first->second.emplace( end, edge_it );
     }
     return g;
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
-inline void digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::rebuild_graph()
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
+inline void digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::rebuild_graph()
 {
-    _g = build_graph( _edges, _nodes );
+    _g = build_graph( _edges, _vertices );
 }
 
-template<typename edge_t, class node_getter, class edge_hash, class edge_equal_to, class node_hash, class node_equal_to>
+template<typename edge_t, class vertex_getter, class edge_hash, class edge_equal_to, class vertex_hash, class vertex_equal_to>
 template<typename InputIterator>
-inline digraph<edge_t, node_getter, edge_hash, edge_equal_to, node_hash, node_equal_to>::digraph( InputIterator begin, InputIterator end ) :
+inline digraph<edge_t, vertex_getter, edge_hash, edge_equal_to, vertex_hash, vertex_equal_to>::digraph( InputIterator begin, InputIterator end ) :
     _edges( detail::to_unique_set<edge_t, edge_hash, edge_equal_to>( begin, end ) )
 {
     std::for_each( _edges.begin(), _edges.end(), [this]( const auto& e ) {
-        _nodes.emplace( node_getter::begin( e ) );
-        _nodes.emplace( node_getter::end( e ) );
+        const auto vertices = vertex_getter()(e);
+        _vertices.emplace( vertices.first );
+        _vertices.emplace( vertices.second );
     } );
-    _nodes = detail::to_unique_set<node_type, node_hash, node_equal_to>( _nodes.begin(), _nodes.end() );
+    _vertices = detail::to_unique_set<vertex_type, vertex_hash, vertex_equal_to>( _vertices.begin(), _vertices.end() );
     rebuild_graph();
 }
 
